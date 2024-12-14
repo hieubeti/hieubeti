@@ -1,0 +1,4 @@
+- 👋 Hi, I’m @hieubeti
+- this is my snake hunt game, u can play on a 8x8 led matrix
+- control the direction of the snake using a joystick.
+- have fun :D
