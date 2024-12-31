@@ -1,164 +1,198 @@
 #include <LedControl.h>
 
-//Define The Snake as a Struct
+// Define The Snake as a Struct
 typedef struct Snake Snake;
-struct Snake{
+struct Snake {
   int head[2];     // the (row, column) of the snake head
-  int body[40][2]; //An array that contains the (row, column) coordinates
-  int len;         //The length of the snake 
-  int dir[2];      //A direction to move the snake along
+  int body[40][2]; // An array that contains the (row, column) coordinates
+  int len;         // The length of the snake 
+  int dir[2];      // A direction to move the snake along
 };
 
-//Define The Apple as a Struct
+// Define The Apple as a Struct
 typedef struct Apple Apple;
-struct Apple{
-  int rPos; //The row index of the apple
-  int cPos; //The column index of the apple
+struct Apple {
+  int rPos; // The row index of the apple
+  int cPos; // The column index of the apple
 };
 
-//MAX72XX led Matrix
-const int DIN =12;
-const int CS =11;
+// MAX72XX LED Matrix
+const int DIN = 12;
+const int CS = 11;
 const int CLK = 10;
-LedControl lc = LedControl(DIN, CLK, CS,1);
+LedControl lc = LedControl(DIN, CLK, CS, 1);
 
-const int varXPin = A3;//X Value  from Joystick
-const int varYPin = A4;//Y Value from Joystick
+const int varXPin = A3; // X Value from Joystick
+const int varYPin = A4; // Y Value from Joystick
 
-byte pic[8] = {0,0,0,0,0,0,0,0};//The 8 rows of the LED Matrix
+byte pic[8] = {0, 0, 0, 0, 0, 0, 0, 0}; // The 8 rows of the LED Matrix
 
-Snake snake = {{1,5},{{0,5}, {1,5}}, 2, {1,0}};//Initialize a snake object
-Apple apple = {(int)random(0,8),(int)random(0,8)};//Initialize an apple object
+Snake snake = {{1, 5}, {{0, 5}, {1, 5}}, 2, {1, 0}}; // Initialize a snake object
+Apple apple = {(int)random(0, 8), (int)random(0, 8)}; // Initialize an apple object
 
-//Variables To Handle The Game Time
+// Variables To Handle The Game Time
 float oldTime = 0;
 float timer = 0;
 float updateRate = 3;
 
-int i,j;//Counters
-void setup() {
-  // put your setup code here, to run once:
-    /*
-   The MAX72XX is in power-saving mode on startup,
-   we have to do a wakeup call
-   */
-  lc.shutdown(0,false);
-  /* Set the brightness to a medium values */
-  lc.setIntensity(0,8);
-  /* and clear the display */
-  lc.clearDisplay(0);
+int score = 0;       // Score tracker
+int level = 1;       // Level tracker
+const int applesPerLevel = 3; // Apples needed to level up
 
-  //Set Joystick Pins as INPUTs
+// "G" and "O" representation for "Game Over"
+byte gameOverG[8] = {0b00111110, 0b01000001, 0b01000000, 0b01001110, 0b01000001, 0b01000001, 0b00111110, 0b00000000};
+byte gameOverO[8] = {0b00111110, 0b01000001, 0b01000001, 0b01000001, 0b01000001, 0b01000001, 0b00111110, 0b00000000};
+
+int i, j; // Counters
+
+void setup() {
+  // Wakeup call for the MAX72XX
+  lc.shutdown(0, false);
+  lc.setIntensity(0, 8); // Set the brightness to medium
+  lc.clearDisplay(0);    // Clear the display
+
+  // Set Joystick Pins as INPUTs
   pinMode(varXPin, INPUT);
   pinMode(varYPin, INPUT);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
   float deltaTime = calculateDeltaTime();
   timer += deltaTime;
 
-  //Check For Inputs
+  // Check For Inputs
   int xVal = analogRead(varXPin);
   int yVal = analogRead(varYPin);
-  
-  if(xVal<100 && snake.dir[1]==0){
+
+  if (xVal < 100 && snake.dir[1] == 0) {
     snake.dir[0] = 0;
     snake.dir[1] = -1;
-  }else if(xVal >920 && snake.dir[1]==0){
+  } else if (xVal > 920 && snake.dir[1] == 0) {
     snake.dir[0] = 0;
     snake.dir[1] = 1;
-  }else if(yVal<100 && snake.dir[0]==0){
+  } else if (yVal < 100 && snake.dir[0] == 0) {
     snake.dir[0] = -1;
     snake.dir[1] = 0;
-  }else if(yVal >920 && snake.dir[0]==0){
+  } else if (yVal > 920 && snake.dir[0] == 0) {
     snake.dir[0] = 1;
     snake.dir[1] = 0;
   }
-  
-  //Update
-  if(timer > 1000/updateRate){
+
+  // Update
+  if (timer > 1000 / updateRate) {
     timer = 0;
     Update();
   }
-  
-  //Render
+
+  // Render
   Render();
-  
 }
 
-float calculateDeltaTime(){
+float calculateDeltaTime() {
   float currentTime = millis();
   float dt = currentTime - oldTime;
   oldTime = currentTime;
   return dt;
 }
 
-void reset(){
-  for(int j=0;j<8;j++){
+void reset() {
+  for (int j = 0; j < 8; j++) {
     pic[j] = 0;
   }
 }
-void Update(){
-  reset();//Reset (Clear) the 8x8 LED matrix
-  
-  int newHead[2] = {snake.head[0]+snake.dir[0], snake.head[1]+snake.dir[1]};
 
-  //Handle Borders
-  if(newHead[0]==8){
-    newHead[0]=0;
-  }else if(newHead[0]==-1){
+void Update() {
+  reset(); // Reset (Clear) the 8x8 LED matrix
+
+  int newHead[2] = {snake.head[0] + snake.dir[0], snake.head[1] + snake.dir[1]};
+
+  // Handle Borders
+  if (newHead[0] == 8) {
+    newHead[0] = 0;
+  } else if (newHead[0] == -1) {
     newHead[0] = 7;
-  }else if(newHead[1]==8){
-    newHead[1]=0;
-  }else if(newHead[1]==-1){
-    newHead[1]=7;
+  } else if (newHead[1] == 8) {
+    newHead[1] = 0;
+  } else if (newHead[1] == -1) {
+    newHead[1] = 7;
   }
-  
-  //Check If The Snake hits itself
-   for(j=0;j<snake.len;j++){
-    if(snake.body[j][0] == newHead[0] && snake.body[j][1] == newHead[1]){
-      //Pause the game for 1 sec then Reset it
-      delay(1000);
-      snake = {{1,5},{{0,5}, {1,5}}, 2, {1,0}};//Reinitialize the snake object
-      apple = {(int)random(0,8),(int)random(0,8)};//Reinitialize an apple object
+
+  // Check If The Snake hits itself
+  for (j = 0; j < snake.len; j++) {
+    if (snake.body[j][0] == newHead[0] && snake.body[j][1] == newHead[1]) {
+      // Display "Game Over"
+      displayGameOver();
+
+      // Reinitialize the game
+      snake = {{1, 5}, {{0, 5}, {1, 5}}, 2, {1, 0}};
+      apple = {(int)random(0, 8), (int)random(0, 8)};
+      score = 0;
+      level = 1;
+      updateRate = 3;
       return;
     }
   }
 
-  //Check if The snake ate the apple
-  if(newHead[0] == apple.rPos && newHead[1] ==apple.cPos){
-    snake.len = snake.len+1;
-    apple.rPos = (int)random(0,8);
-    apple.cPos = (int)random(0,8);
-  }else{
-    removeFirst();//Shifting the array to the left
+  // Check if The snake ate the apple
+  if (newHead[0] == apple.rPos && newHead[1] == apple.cPos) {
+    snake.len = snake.len + 1;
+    apple.rPos = (int)random(0, 8);
+    apple.cPos = (int)random(0, 8);
+    score++;
+
+    // Uncomment to enable level progression(*****)
+  
+    if (score % applesPerLevel == 0) {
+      level++;
+      updateRate += 1; // Increase game speed
+    }
+    //(*****)
+
+  } else {
+    removeFirst(); // Shifting the array to the left
   }
-  
-  snake.body[snake.len-1][0]= newHead[0];
-  snake.body[snake.len-1][1]= newHead[1];
-  
+
+  snake.body[snake.len - 1][0] = newHead[0];
+  snake.body[snake.len - 1][1] = newHead[1];
+
   snake.head[0] = newHead[0];
   snake.head[1] = newHead[1];
-  
-  //Update the pic Array to Display(snake and apple)
-  for(j=0;j<snake.len;j++){
+
+  // Update the pic Array to Display (snake and apple)
+  for (j = 0; j < snake.len; j++) {
     pic[snake.body[j][0]] |= 128 >> snake.body[j][1];
   }
   pic[apple.rPos] |= 128 >> apple.cPos;
-  
 }
 
-void Render(){
-  
-   for(i=0;i<8;i++){
-    lc.setRow(0,i,pic[i]);
-   }
-}
-
-void removeFirst(){
-  for(j=1;j<snake.len;j++){
-    snake.body[j-1][0] = snake.body[j][0];
-    snake.body[j-1][1] = snake.body[j][1];
+void Render() {
+  for (i = 0; i < 8; i++) {
+    lc.setRow(0, i, pic[i]);
   }
+}
+
+void removeFirst() {
+  for (j = 1; j < snake.len; j++) {
+    snake.body[j - 1][0] = snake.body[j][0];
+    snake.body[j - 1][1] = snake.body[j][1];
+  }
+}
+
+void displayGameOver() {
+  lc.clearDisplay(0); // Clear the LED matrix
+
+  // Display "G" on the left
+  for (int i = 0; i < 8; i++) {
+    lc.setRow(0, i, gameOverG[i]);
+  }
+
+  delay(1000); // Pause 1 second
+
+  // Display "O" on the right
+  for (int i = 0; i < 8; i++) {
+    lc.setRow(0, i, gameOverO[i]);
+  }
+
+  delay(2000); // Pause 2 seconds
+  lc.clearDisplay(0); // Clear the display
 }
